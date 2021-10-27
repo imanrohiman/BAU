@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+    environment {
+        def user = "bmsauto"
+		def devsvr = "10.23.52.130"
+		def stgsvr = "10.26.182.253"
+		def prodsvr = "10.26.174.160"
+		
+    }
+    stages {
+        stage('Checkout code') {
+            steps {
+                // checkout scm
+                sh 'ls -al'
+            }
+        }
+		
+		stage("Proses Backup Database ") {
+            steps {
+                script {
+					echo "Backup DB DEV"
+					sh "ssh $user@$devsvr ./backupdb.sh"
+					sh "scp $user@$devsvr:/home/$user/*.txt ."
+					
+					echo "Backup DB STG"
+					sh "ssh $user@$stgsvr ./backupdb.sh"
+					sh "scp $user@$stgsvr:/home/$user/*.txt ."
+					
+					echo "Backup DB Prod"
+					sh "ssh $user@$prodsvr ./backupdb.sh"
+					sh "scp $user@$prodsvr:/home/$user/*.txt ."
+                }
+            }
+        } //End Stage Backup
+        
+      
+    } //End Stages
+    
+    post {
+        always {
+            echo  "Kirim Notif EMail Sukses atau Gagal"
+            emailext(
+                to: 'operations.adli@axiatadigitallabs.com; tri.budiyono@axiatadigitallabs.com',
+                body: '${DEFAULT_CONTENT} <br><br> Backup BAU DB DEV<br> File 1 : <br> ${FILE, path="bau_dev.txt"} <br><br> FIle 2 : <br> ${FILE, path="camunda_dev.txt"} <br><br><br> Backup BAU DB STG<br> File 1 : <br> ${FILE, path="bau_stg.txt"} <br><br> FIle 2 : <br> ${FILE, path="camunda_stg.txt"} <br><br><br> Backup BAU DB Prod<br> File 1 : <br> ${FILE, path="bau_prod.txt"} <br><br> FIle 2 : <br> ${FILE, path="camunda_prod.txt"} ',
+                mimeType: 'text/html',
+                subject: '${DEFAULT_SUBJECT}',
+                replyTo: '$DEFAULT_REPLYTO'     
+            ) 
+        }
+    }
+}
